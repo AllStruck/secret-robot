@@ -1,5 +1,5 @@
 {
 	"nickname": "example.com",
-	"nickname2": "example.com:42123",
-	"nickname3": "nickname2"
+	"nickname2": "example.com:12345",
+	"nickname3": "example.com:12345"
 }
