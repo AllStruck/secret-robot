@@ -7,6 +7,13 @@ Before using you should copy `keys.json.example` to `keys.json` and update `keys
 
 I'm also using a `hosts-aliases.json` file for easier assignment of single hosts by nickname (see `hosts-liases.json.example`).
 
+You will also need the following requirements locally:
+ * Python
+ * Fabric
+ * IPython
+
+Servers will need [Turbolift]https://github.com/cloudnull/turbolift installed to upload files to RackSpace Cloud Files.
+
 Once everything is in place you can do something like this:
 `fab newlampvhost:sub.domain.com`
 
