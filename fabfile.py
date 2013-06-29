@@ -2,13 +2,16 @@
 from __future__ import with_statement
 from IPython import embed
 from fabric.api import *
+from fabric.contrib import files
 from fabric.contrib.console import confirm
 from fabric.colors import red, green, blue, yellow
 import json
-import os
+import sys, os
 import openstack.compute
 import clouddns
 import datetime
+import socket
+from jinja2 import Environment, PackageLoader
 
 now = datetime.datetime.now()
 datetime = now.strftime("%Y-%m-%d_%H:%M")
@@ -23,12 +26,12 @@ with open('./keys.json') as f:
 with open('./host-aliases.json') as f:
 	hostaliases = json.load(f)
 	for key,val in enumerate(env.hosts):
-		env.hosts[key] = nicenametohost(val)
+		env.hosts[key] = hostaliases[val]
 
 env.user = 'root'
 
 vhostroot = '/var/www/vhost/'
-apachevhostconfigdir = '/etc/apache2/sites-available'
+apachevhostconfigdir = '/etc/apache2/sites-available/'
 
 def setup():
 	group_ensure("remote_admin")
@@ -50,14 +53,15 @@ def dovhostcommand(vhost, command):
 	if "wwwpermissions" in command:
 		wwwpermissions(location)
 
-def newlampvhost(domain, dbname, installcms=False, ip=False, skipbackup=False):
+##MAIN##
+def lampvhostmk(domain, dbname, installcms=False, ip=False, skipbackup=False):
 	if not ip:
 		ip = gethostipbyhost(env.host_string)
 	if not skipbackup:
 		serverimagemk(True)
-	entry,parent = splitsubdomain(domain)
+	entry,parent = split_subdomain(domain)
 	dnsmk(parent,ip,entry)
-	newapachevhost(domain)
+	apachevhostmk(domain)
 	newmysqldb(dbname)
 	newmysqluserpassword = createrandompassword()
 	print "New user password: " + newmysqluserpassword
@@ -66,16 +70,42 @@ def newlampvhost(domain, dbname, installcms=False, ip=False, skipbackup=False):
 		installwordpress(stable, vhostroot + domain + 'public/')
 		wwwpermissions(vhostroot + domain + 'public/')
 
-def newapachevhost(url):
+# APACHE:
+def apachevhostmk(url,skipenable=False):
+	with cd(vhostroot):
+		run('mkdir ' + url)
+		with cd('./' + url):
+			run('mkdir public log backup')
 	with cd(apachevhostconfigdir):
-		put('./apache-vhost-template.conf', url)
-	#run('a2newsite ' + url)
+		replacements = {
+			'vhost_public_dir': vhostroot + url,
+			'admin_email': getadminemail(url),
+			'domain': url,
+			'datetime':datetime + ' MST -0700'
+		}
+		print 'Uploading template...'
+		files.upload_template(filename=os.getcwd()+"/apache-vhost-template.conf", destination=apachevhostconfigdir+url, context=replacements)
+		if not skipenable:
+			a2('ensite', url)
+			a2('reload')
+def apachevhostrm(url, safe=True):
+	with settings(warn_only=True):
+		a2('dissite', url)
+		a2('reload')
+		rm(vhostroot + url, '-rf', safe=safe)
+		rm(apachevhostconfigdir + url, safe=safe)
 
+# MYSQL:
 def newmysqldb(dbname):
 	run('sqlnewdb ' + dbname)
 
-def newmysqluser(dbname, dbuser, dbpassword):
+def newmysqluser(dbname, dbuser, dbpassword=False):
 	run('sqlnewdbuser ' + dbname + ' ' + dbuser)
+
+
+##
+def getadminemail(subject='admin'):
+	return subject + '@' + str(getdomainfromhost(env.host_string))
 
 def installwordpress(version, location):
 	version_commands = {
@@ -145,7 +175,7 @@ def serverimagemk(wait=False):
 	image = compute.images.find(name=getserverbyname(env.host_string) + '-' + datetime)
 	if wait:
 		print "Waiting for server image to complete."
-		serverimageprogresswatcher(image.id)
+		server_image_progress_watcher(image.id)
 
 def serverimagels(imagename=False,imageid=False):
 	if imagename or imageid:
@@ -187,7 +217,7 @@ def serverimageprogress(imageid=False, verbosity=1):
 	if not imageid:
 		print "ERROR: Must provide imageid=id"
 		return -1
-	if not server_image_complete(imageid, 0):
+	if not server_image_is_complete(imageid, 0):
 		image = compute.images.get(imageid)
 		if hasattr(image, 'status'):
 			if image.status == 'SAVING':
@@ -213,7 +243,7 @@ def serverimageprogress(imageid=False, verbosity=1):
 			print "100 % Complete"
 		return 100
 
-def server_image_complete(imageid=False, verbosity=1):
+def server_image_is_complete(imageid=False, verbosity=1):
 	if not imageid:
 		print "ERROR: Must provide imageid=id"
 		return
@@ -234,17 +264,17 @@ def server_image_complete(imageid=False, verbosity=1):
 		print 'Problem! image.status is: ' + str(image.status)
 		return
 
-def serverimageprogresswatcher(imageid, delay=23, verbosity=0):
+def server_image_progress_watcher(imageid, delay=23, verbosity=0):
 	import time
 	if not imageid:
 		print "ERROR: Must provide imageid=id"
 		return
-	while not server_image_complete(imageid, verbosity):
+	while not server_image_is_complete(imageid, verbosity):
 		print str(serverimageprogress(imageid, verbosity)) + '%'
 		time.sleep(delay)
 
 
-def serverls(instance=False):
+def cloudserverls(instance=False):
 	if instance:
 		servers = compute.servers.findall(name=getserverbyname(instance))
 		for server in servers:
@@ -261,7 +291,7 @@ def serverls(instance=False):
 				print 'Progress: ' + str(details.progress)
 			print ''
 
-def splitsubdomain(domain):
+def split_subdomain(domain):
 	entry = parent = domain
 	if domain.count('.') > 1:
 		entry = domain
@@ -290,9 +320,32 @@ def getserverbyname(host):
 		else:
 			return names[names.index(host)]
 
+def getdomainfromhost(host):
+	domains = {
+		'allstruck.com': 		'allstruck.com',
+		'allstruck.net:42123': 	'allstruck.com',
+		'allstruck.org:42123': 	'allstruck.com',
+		'50.56.239.226':	'allstruck.com'
+	}
+	return domains[host]
+
+def a2(task='',att=''):
+	tasks = {
+		'restart': "run('/etc/init.d/apache2 restart')",
+		'reload': "run('/etc/init.d/apache2 reload')",
+		'ensite': "run('a2ensite ' + att)",
+		'dissite': "run('a2dissite ' + att)",
+		'enmod': "run('a2enmod ' + att)",
+		'dismod': "run('a2dismod ' + att)",
+		'sites-available': "run('ls " + apachevhostconfigdir + "')",
+		'sites': "run('ls " + vhostroot + "')"
+	}
+	eval(tasks[task])
+
 def nicenametohost(nicename):
 	if nicename in hostaliases:
 		return hostaliases[nicename]
+	return nicename
 
 def createrandompassword(length=8):
 	import string
@@ -300,11 +353,37 @@ def createrandompassword(length=8):
 	chars = string.letters + string.digits
 	return ''.join(choice(chars) for _ in xrange(length))
 
-def test(message):
+def ls(search='~/', att='-la'):
+	run('ls --color ' + att + ' ' + search)
+def rm(path, att='', safe=True):
+	if safe:
+		with shell_env(OS_USERNAME=keychain['rackspaceuser'], OS_API_KEY=keychain['rackspaceapikey'], OS_PASSWORD=keychain['rackspaceapikey'], OS_AUTH_URL='https://identity.api.rackspacecloud.com/v2.0/', OS_REGION_NAME='dfw'):
+			if path[-4:] == '.zip':
+				run('turbolift -r dfw upload --source '+path+' --container secret-robot-safe-delete')
+			else: 
+				# Zip contents of file or directory (and remove contents),
+				#  upload to cloud files, then delete zip file:
+				tempzipfilename = path+'-'+datetime+'.zip'
+				run('zip -rTm '+tempzipfilename+' '+path)
+				cloudfilesupload(tempzipfilename, 'secret-robot-safe-delete')
+				run('rm ' + tempzipfilename)
+	run('rm ' + att + ' ' + path)
+def touch(path):
+	run('touch ' + path)
+def mkdir(dir):
+	run('mkdir ' + dir)
+
+def cloudfilesupload(source,container):
+	run('turbolift -r dfw upload --source ' + source + ' --container ' + container)
+
+def lprint(message):
 	print message
 
-def stest(message):
+def echo(message):
 	run('echo ' + message)
 
-def interactive():
-	embed() # this call anywhere in your program will start IPython
+def console():
+	embed() # IPython
+
+def c():
+	console()

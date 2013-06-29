@@ -1,4 +1,4 @@
 {
-	"rackspace-user": "username",
-	"rackspace-api-key": "apikey"
+	"rackspaceuser": "username",
+	"rackspaceapikey": "apikey"
 }
