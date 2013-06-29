@@ -12,7 +12,7 @@ You will also need the following requirements locally:
  * Fabric
  * IPython
 
-Servers will need [Turbolift]https://github.com/cloudnull/turbolift installed to upload files to RackSpace Cloud Files.
+Servers will need [Turbolift](https://github.com/cloudnull/turbolift) installed to upload files to RackSpace Cloud Files.
 
 Once everything is in place you can do something like this:
 `fab newlampvhost:sub.domain.com`
