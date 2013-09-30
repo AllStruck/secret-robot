@@ -15,8 +15,15 @@ You will also need the following requirements locally:
 Servers will need [Turbolift](https://github.com/cloudnull/turbolift) installed to upload files to RackSpace Cloud Files.
 
 Once everything is in place you can do something like this:
-`fab newlampvhost:sub.domain.com`
-
+`fab lampvhostmk:sub.domain.com,cms=wordpress`
+This will prompt these actions:
+ * create image of cloud server
+ * create A record under domain.com for sub.domain.com
+ * create Apache vhost and enable it
+ * create MySQL database and user with permissions on it
+ * copy in WordPress files from SVN
+ * print out randomly generated MySQL password, WP prefix, WP admin user, and WP admin password
+ 
 ## Goals ##
 
 The first most important goal of this projects is to follow the outline below by using this command `newlampvhost cms=wp version=stable server=nickname dbname=xucvio`:

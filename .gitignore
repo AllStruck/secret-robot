@@ -1,6 +1,8 @@
 keys.json
 host-aliases.json
 
+.DS_Store
+
 *.py[cod]
 
 # C extensions
