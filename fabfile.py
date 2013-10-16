@@ -298,6 +298,10 @@ def wordpressdevcopy(location, dbname, dbuser, dbpass, dbprefix):
     #         lprint('Import:')
     #         run('mysql --user=root --password=$SQLROOTPWD ' + dbname + ' < ' + mysqldumpfilename)
 
+def wpcli(domain,command,parameters):
+    with cd('/var/www/vhost/'+domain+'/public/'):
+        run('wp ' + command+' '+parameters)
+
 def wwwpermissions(directory):
     with cd(directory):
         run('chown -R www-data .')
