@@ -100,6 +100,7 @@ def lampvhostmk(domain, dbname, parent=False, installcms=False, ip=False, skipba
         randomauthstuff += 'WP Table Prefix: ' + randomprefix + "\n"
         randomauthstuff += 'WP Admin User: ' + randomuser + "\n"
         randomauthstuff += 'WP Admin Password: ' + randompassword + "\n"
+        local('security add-internet-password -a '+randomuser+' -s '+domain+' -r http -w '+randompassword+' -T "" -D "Web form password" -t mrof')
     if installcms == "wordpress":
         with cd(apachevhostroot + domain + '/public/'):
             wordpressdownload('stable', apachevhostroot + domain + '/public/')
