@@ -1,6 +1,7 @@
 {
     "nginx.showstat.us": "digitalocean",
     "showstat.us": "digitalocean",
+    "162.243.151.162": "digitalocean",
     "64.49.246.208": "rackspace-cloud",
     "allstruck.org:42123": "rackspace-cloud",
     "allstruck.com": "rackspace-cloud",

@@ -106,20 +106,34 @@ def lampvhostmk(domain, dbname, parent=False, installcms=False, ip=False, skipba
             wordpressdownload('stable', apachevhostroot + domain + '/public/')
             run('wp core config --dbname='+dbname+' --dbuser='+dbname+' --dbpass='+newmysqluserpassword+' --dbhost=localhost'+' --dbprefix='+randomprefix)
             run('wp core install --url='+domain+' --title='+domain+' --admin_name='+randomuser+' --admin_password='+randompassword+' --admin_email='+emailAddress)
-            run('wp rewrite structure /%postname%/')
-            run('wp rewrite flush -hard')
+            put(local_path=os.getcwd()+"/wp-cli.yml", remote_path='./wp-cli.yml')
             run('wp option update uploads_use_yearmonth_folders 0')
-            # run("wp option update wpseo '{&quot;ignore_tour&quot;: &quot;ignore_tour&quot;}' --format=json")
+            run('wp rewrite structure /%postname%/')
+            run('wp rewrite flush --hard')
             run('wp plugin install wordpress-seo --activate')
             run('wp plugin install google-analytics-for-wordpress')
             run('wp plugin install developer')
             run('wp plugin install types')
             run('wp plugin install woocommerce')
-            run('wp plugin install jetpack --activate')
+            run('wp plugin install jetpack')
+            run('wp plugin install w3-total-cache')
             run('wp plugin install http://db792452fba63cb630b7-494dd5f25ead0ca5c6062a6a9e84232b.r79.cf1.rackcdn.com/gravityforms.zip')
-            # run('wp plugin install http://db792452fba63cb630b7-494dd5f25ead0ca5c6062a6a9e84232b.r79.cf1.rackcdn.com/backupbuddy.zip')
             run('wp theme install http://db792452fba63cb630b7-494dd5f25ead0ca5c6062a6a9e84232b.r79.cf1.rackcdn.com/headway.zip')
             run('wp theme install http://db792452fba63cb630b7-494dd5f25ead0ca5c6062a6a9e84232b.r79.cf1.rackcdn.com/allstruck-headway.zip --activate')
+            run('wp plugin install https://github.com/AllStruck/custom-post-type-archive-menu/archive/master.zip --activate')
+
+            run('wp option update timezone_string America/Phoenix')
+            run('wp option update time_format "g:i A"')
+            run('wp option update date_format "F jS, Y"')
+            run('wp option update start_of_week Sunday')
+            run('wp option update blog_public 0')
+            run('wp option update uploads_use_yearmonth_folders 0')
+            run('wp post create --post_type=page --post_status=publish --post_title=Home --post_content="Sample home page content."')
+            run('wp post create --post_type=page --post_status=publish --post_title=News')
+            run('wp post delete 2 --force')
+            run('wp option update show_on_front page')
+            run('wp option update page_on_front 3')
+            run('wp option update page_for_posts 4')
             wwwpermissions(apachevhostroot + domain + '/public/')
     elif installcms == "wpcmspro":
         wordpressdevcopy(domain,dbname,dbname,newmysqluserpassword,randomprefix)
@@ -260,9 +274,11 @@ def testfind(location="test.allstruck.org"):
     with cd('/var/www/vhost/test.allstruck.org/public'):
         run('find ./ -type f -print0 | xargs -0 sed -i "s/wp-install-template.allstruck.org/' + location + '/g"')
 
-
 def wordpressdevcopy(location, dbname, dbuser, dbpass, dbprefix):
     hprint("Creating copy of WordPress Dev install.")
+    eprint("THIS DOES NOT WORK, QUITTING...")
+    return
+
     with cd('/var/www/vhost/' + location + '/public'):
         lprint("Moving files...")
         run('cp -a /var/www/vhost/wp-install-template.allstruck.org/public/* ./')
@@ -682,7 +698,8 @@ def gethostipbyhost(host):
         'allstruck.org:42123':  '204.232.201.73',
         '64.49.246.208':        '64.49.246.208',
         'showstat.us':          '192.241.204.120',
-        'nginx.showstat.us':    '192.241.230.20'
+        'nginx.showstat.us':    '192.241.230.20',
+        '162.243.151.162':      '162.243.151.162'
     }
     return ipaddresses[host]
 
@@ -694,7 +711,7 @@ def getserverbyname(host, lower=False):
         'allstruck.org:42123':  'McKay',
         '64.49.246.208':        'Cooper',
         'showstat.us':          'Carter',
-        'nginx.showstat.us':    'Fleinhardt'
+        '162.243.151.162':      'Maxwell'
     }
     result = ''
     if host in names:
@@ -715,7 +732,8 @@ def getdomainfromhost(host):
         'allstruck.org:42123':  'allstruck.com',
         '64.49.246.208':        'allstruck.com',
         'showstat.us':          'allstruck.com',
-        'nginx.showstat.us':    'allstruck.com'
+        'nginx.showstat.us':    'allstruck.com',
+        '162.243.151.162':      'allstruck.com'
     }
     return domains[host]
 
@@ -759,7 +777,8 @@ def hosttonicename(host):
         'allstruck.net:42123': 'clients',
         'allstruck.org:42123': 'mckay',
         '64.49.246.208': 'cooper',
-        'showstat.us': 'carter'
+        'showstat.us': 'carter',
+        '162.243.151.162': 'maxwell'
     }
     if nicenames.has_key(host):
         return nicenames[host]
