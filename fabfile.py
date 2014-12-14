@@ -21,22 +21,28 @@ import clouddns
 
 import digitalocean
 
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 now = datetime.datetime.now()
 datetime = now.strftime("%Y-%m-%d_%H:%M")
 
 
 with open('./keys.json') as f:
     keychain = json.load(f)
-    pyrax.set_setting("debug", True)
-    pyrax.set_setting("region", "DFW")
-    pyrax.set_setting("identity_type", "rackspace")
-    pyrax.set_credentials(keychain['rackspaceuser'], keychain['rackspaceapikey'])
-    cf = pyrax.cloudfiles
-    cs = pyrax.cloudservers
-    cdns = pyrax.cloud_dns
+    # pyrax.set_setting("debug", True)
+    # pyrax.set_setting("region", "DFW")
+    # pyrax.set_setting("identity_type", "rackspace")
+    # pyrax.set_credentials(keychain['rackspaceuser'], keychain['rackspaceapikey'])
+    # cf = pyrax.cloudfiles
+    # cs = pyrax.cloudservers
+    # cdns = pyrax.cloud_dns
     dodns = digitalocean.Domain(client_id=keychain['digitaloceanuser'], api_key=keychain['digitaloceanapikey'])
-    compute = openstack.compute.Compute(username=keychain['rackspaceuser'], apikey=keychain['rackspaceapikey'])
-    dns = clouddns.connection.Connection(keychain['rackspaceuser'], keychain['rackspaceapikey'])
+    # compute = openstack.compute.Compute(username=keychain['rackspaceuser'], apikey=keychain['rackspaceapikey'])
+    # dns = clouddns.connection.Connection(keychain['rackspaceuser'], keychain['rackspaceapikey'])
 
 with open('./host-aliases.json') as f:
     hostaliases = json.load(f)
@@ -86,10 +92,11 @@ def lampvhostmk(domain, dbname, parent=False, installcms=False, ip=False, skipba
         entry, parent = split_subdomain(domain)
     else:
         entry = domain
-    dnsmk(domain=parent, subdomain=entry, location=ip)
+    # dnsmk(domain=parent, subdomain=entry, location=ip)
     apachevhostmk(domain)
     newmysqluserpassword = createrandompassword(13)
-    randomauthstuff = "MySQL user (" + dbname + ") password: " + newmysqluserpassword + "\n"
+    randomauthstuff = domain + "\n"
+    randomauthstuff += "MySQL user (" + dbname + ") password: " + newmysqluserpassword + "\n"
     mysqlmk(dbname, dbname, newmysqluserpassword)
     if installcms == "wordpress" or installcms == "wpcmspro":
         randomprefix = createrandompassword(3) + '_'
@@ -104,43 +111,92 @@ def lampvhostmk(domain, dbname, parent=False, installcms=False, ip=False, skipba
     if installcms == "wordpress":
         with cd(apachevhostroot + domain + '/public/'):
             wordpressdownload('stable', apachevhostroot + domain + '/public/')
-            run('wp core config --dbname='+dbname+' --dbuser='+dbname+' --dbpass='+newmysqluserpassword+' --dbhost=localhost'+' --dbprefix='+randomprefix)
-            run('wp core install --url='+domain+' --title='+domain+' --admin_name='+randomuser+' --admin_password='+randompassword+' --admin_email='+emailAddress)
+            run('wp --allow-root core config --dbname='+dbname+' --dbuser='+dbname+' --dbpass='+newmysqluserpassword+' --dbhost=localhost'+' --dbprefix='+randomprefix)
+            run('wp --allow-root core install --url='+domain+' --title='+domain+' --admin_name='+randomuser+' --admin_password='+randompassword+' --admin_email='+emailAddress)
             put(local_path=os.getcwd()+"/wp-cli.yml", remote_path='./wp-cli.yml')
-            run('wp option update uploads_use_yearmonth_folders 0')
-            run('wp rewrite structure /%postname%/')
-            run('wp rewrite flush --hard')
-            run('wp plugin install wordpress-seo --activate')
-            run('wp plugin install google-analytics-for-wordpress')
-            run('wp plugin install developer')
-            run('wp plugin install types')
-            run('wp plugin install woocommerce')
-            run('wp plugin install jetpack')
-            run('wp plugin install w3-total-cache')
-            run('wp plugin install http://db792452fba63cb630b7-494dd5f25ead0ca5c6062a6a9e84232b.r79.cf1.rackcdn.com/gravityforms.zip')
-            run('wp theme install http://db792452fba63cb630b7-494dd5f25ead0ca5c6062a6a9e84232b.r79.cf1.rackcdn.com/headway.zip')
-            run('wp theme install http://db792452fba63cb630b7-494dd5f25ead0ca5c6062a6a9e84232b.r79.cf1.rackcdn.com/allstruck-headway.zip --activate')
-            run('wp plugin install https://github.com/AllStruck/custom-post-type-archive-menu/archive/master.zip --activate')
+            run('wp --allow-root option update uploads_use_yearmonth_folders 0')
+            run('wp --allow-root rewrite structure /%postname%/')
+            run('wp --allow-root rewrite flush --hard')
+            # run('wp --allow-root plugin install wordpress-seo --activate')
+            run('wp --allow-root plugin install google-analytics-for-wordpress')
+            run('wp --allow-root plugin install developer')
+            run('wp --allow-root plugin install types')
+            run('wp --allow-root plugin install woocommerce')
+            run('wp --allow-root plugin install jetpack')
+            run('wp --allow-root plugin install w3-total-cache')
+            run('wp --allow-root plugin install http://alldev.showstat.us/wp-content/uploads/gravityforms.zip')
+            run('wp --allow-root theme install http://alldev.showstat.us/wp-content/uploads/headway.zip')
+            run('wp --allow-root theme install http://alldev.showstat.us/wp-content/uploads/allstruck-headway.zip --activate')
+            run('wp --allow-root plugin install https://github.com/AllStruck/custom-post-type-archive-menu/archive/master.zip --activate')
 
-            run('wp option update timezone_string America/Phoenix')
-            run('wp option update time_format "g:i A"')
-            run('wp option update date_format "F jS, Y"')
-            run('wp option update start_of_week Sunday')
-            run('wp option update blog_public 0')
-            run('wp option update uploads_use_yearmonth_folders 0')
-            run('wp post create --post_type=page --post_status=publish --post_title=Home --post_content="Sample home page content."')
-            run('wp post create --post_type=page --post_status=publish --post_title=News')
-            run('wp post delete 2 --force')
-            run('wp option update show_on_front page')
-            run('wp option update page_on_front 3')
-            run('wp option update page_for_posts 4')
+            run('wp --allow-root option update timezone_string America/Phoenix')
+            run('wp --allow-root option update time_format "g:i A"')
+            run('wp --allow-root option update date_format "F jS, Y"')
+            run('wp --allow-root option update start_of_week Sunday')
+            run('wp --allow-root option update blog_public 0')
+            run('wp --allow-root option update uploads_use_yearmonth_folders 0')
+            run('wp --allow-root post create --post_type=page --post_status=publish --post_title=Home --post_content="Sample home page content."')
+            run('wp --allow-root post create --post_type=page --post_status=publish --post_title=News')
+            run('wp --allow-root post delete 2 --force')
+            run('wp --allow-root option update show_on_front page')
+            run('wp --allow-root option update page_on_front 3')
+            run('wp --allow-root option update page_for_posts 4')
             wwwpermissions(apachevhostroot + domain + '/public/')
+            # local('casperjs casper.js --user='+randomuser+' --pass='+randompassword+' --domain='+domain)
+            # wordpressfesetup(domain,randomuser,randompassword)
+            # driver = webdriver.PhantomJS()
+            # # driver = webdriver.Chrome('./chromedriver')
+            # driver.get('http://'+domain+'/wp-login.php')
+            # form_username = driver.find_element_by_name("log")
+            # form_password = driver.find_element_by_name("pwd")
+            # form_username.send_keys(randomuser)
+            # form_password.send_keys(randompassword)
+            # form_password.submit()
+            # driver.get('http://'+domain+'/wp-admin/')
+            # closebutton = driver.find_element_by_css_selector('#pointer-close')
+            # closebutton.click()
+            # driver.get('http://'+domain+'/wp-admin/update-core.php')
+            # closebutton = driver.find_element_by_css_selector('#pointer-close')
+            # closebutton.click()
+            # driver.get('http://'+domain+'/wp-admin/admin.php?page=headway-templates')
+            # try:
+            #     driver.execute_script('jQuery("form#upload-skin").css("display","block");')
+            #     templateuploadformfield = driver.find_element_by_css_selector("#upload-skin input[type=file]")
+            #     templateuploadformfield.send_keys(os.path.abspath('headway-template.json'))
+            #     element = WebDriverWait(driver, 180).until(
+            #         EC.presence_of_element_located((By.CSS_SELECTOR, "div.headway-template[data-template-id=business-gol] a.button-primary"))
+            #     )
+            #     element.click()
+            # finally:
+            #     driver.quit()
+            # driver.get('http://'+domain+'/wp-admin/')
+            # try:
+            #     driver.execute_script('jQuery("form#upload-skin").css("display","block");')
+            #     element = WebDriverWait(driver, 180).until(
+            #         EC.presence_of_element_located((By.CSS_SELECTOR, "a#pointer-close"))
+            #     )
+            #     element.click()
+            # finally:
+            #     driver.quit()
+            # try:
+            #     driver.execute_script('jQuery("form#upload-skin").css("display","block");')
+            #     element = WebDriverWait(driver, 180).until(
+            #         EC.presence_of_element_located((By.CSS_SELECTOR, "a#pointer-close"))
+            #     )
+            #     element.click()
+            # finally:
+            #     driver.quit()
+            # # driver.execute_script('jQuery("#upload-skin input[type=file]").first().trigger("change");')
+            # # templateuploadformfield.submit()
+            # # templateuploadform = driver.find_element_by_css_selector('#upload-skin')
+            # # driver.find_element_by_css_selector("#upload-skin").submit()
     elif installcms == "wpcmspro":
         wordpressdevcopy(domain,dbname,dbname,newmysqluserpassword,randomprefix)
     print randomauthstuff
 
-def lampvhostrm(domain):
-    pass
+def lampvhostrm(domain,db,safe=True):
+    apachevhostrm(domain,safe)
+    mysqlrm(db,db,safe)
 
 def apachevhostmk(url, skipenable=False):
     with cd(apachevhostroot):
@@ -266,7 +322,7 @@ def wordpressdownload(version, location):
     #     'trunk': 'svn co http://core.svn.wordpress.org/trunk/ .'
     # }
     with cd(location):
-        run("wp core download")
+        run("wp --allow-root core download")
         # run(version_commands[version])
 
 
@@ -274,46 +330,125 @@ def testfind(location="test.allstruck.org"):
     with cd('/var/www/vhost/test.allstruck.org/public'):
         run('find ./ -type f -print0 | xargs -0 sed -i "s/wp-install-template.allstruck.org/' + location + '/g"')
 
-def wordpressdevcopy(location, dbname, dbuser, dbpass, dbprefix):
-    hprint("Creating copy of WordPress Dev install.")
-    eprint("THIS DOES NOT WORK, QUITTING...")
-    return
+def wordpresscopy(origin,desitnation):
+    cp('/var/www/vhost/')
 
-    with cd('/var/www/vhost/' + location + '/public'):
-        lprint("Moving files...")
-        run('cp -a /var/www/vhost/wp-install-template.allstruck.org/public/* ./')
-        lprint("Replacing old url with new...")
-        run('find ./wp-content/themes/ -type f -exec sed -i "s#wp-install-template.allstruck.org#'+ location +'#g" {} \;')
-        run('find ./wp-content/plugins/ -type f -exec sed -i "s#wp-install-template.allstruck.org#'+ location +'#g" {} \;')
-        run('find ./wp-content/cache/ -type f -exec sed -i "s#wp-install-template.allstruck.org#'+ location +'#g" {} \;')
-        run('find ./wp-content/*.php -type f -exec sed -i "s#wp-install-template.allstruck.org#'+ location +'#g" {} \;')
-        lprint('Adding new settings to wp-config.php')
-        sed("./wp-config.php", "asu_", dbprefix, flags="m")
-        run('sed -i "s#define(\'DB_NAME\', \'wpinstalltemp\')#define(\'DB_NAME\', \''+dbname+'\')#mg" wp-config.php')
-        run('sed -i "s#define(\'DB_USER\', \'wpinstalltemp\')#define(\'DB_NAME\', \''+dbuser+'\')#mg" wp-config.php')
-        run('sed -i "s#define(\'DB_PASSWORD\', \'[^\']*\')#define(\'DB_NAME\', \''+dbpass+'\')#mg" wp-config.php')
-        # sed("./wp-config.php", "define(\'DB_NAME\', \'wpinstalltemp\')", "define(\'DB_NAME\', \'" + dbname + "\')")
-        # sed("./wp-config.php", "define(\'DB_USER\', \'wpinstalltemp\')/define(\'DB_USER\', \'" + dbuser + "\')")
-        # sed("./wp-config.php", "define(\'DB_PASSWORD\', \'[^\']*\')", "define(\'DB_PASSWORD\', \'" + dbpass + "\')")
+def wordpressfesetup(domain,username,password):
+    # driver = webdriver.PhantomJS()
+    # driver = webdriver.Chrome('./chromedriver')
+    driver = webdriver.Firefox()
+    # driver.get('http://'+domain+'/wp-admin/')
+    # closebutton = driver.find_element_by_css_selector('#pointer-close')
+    # closebutton.click()
+    # driver.get('http://'+domain+'/wp-admin/update-core.php')
+    # closebutton = driver.find_element_by_css_selector('#pointer-close')
+    # closebutton.click()
+    try:
+        driver.set_window_size(1024, 850)
+        driver.get('http://'+domain+'/wp-login.php')
+        form_username = driver.find_element_by_name("log")
+        form_password = driver.find_element_by_name("pwd")
+        form_username.send_keys(username)
+        form_password.send_keys(password)
+        form_password.submit()
+        hprint("Installing Headway Template.")
+        driver.get('http://'+domain+'/wp-admin/admin.php?page=headway-templates')
+        try:
+            driver.execute_script('jQuery("form#upload-skin").show();')
+            driver.execute_script('jQuery("#upload-skin input[type=file]").show();')
+            templateuploadformfield = driver.find_element_by_css_selector("form#upload-skin input[type=file]")
+            templateuploadformfield.send_keys(os.path.abspath('headway-template.json'))
+            # Activate Headway Template
+            element = WebDriverWait(driver, 90).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.headway-template[data-template-id=business-gol] a.button-primary"))
+            )
+            if element.is_displayed():
 
-    lprint('Now handling the database...')
-    # with cd('/var/www/vhost/wp-install-template.allstruck.org/public/'):
-    #     run('wp db export')
-    # with cd('/var/www/vhost/' + location + '/backup'):
-    #     with shell_env(SQLROOTPWD=passwordstore(server=env.host_string, service='mysql', user='root')):
-    #         templatedbname = 'wpinstalltemp'
-    #         mysqldumpfilename = 'wpinstalltemp.sql'
-    #         lprint('Export:')
-    #         run('mysqldump -n --quick --result-file='+mysqldumpfilename+' --databases ' + templatedbname + ' --user=root --password=$SQLROOTPWD')
-    #         lprint('Replace:')
-    #         run('sed -i "s#wp-install-template.allstruck.org#'+location+'#mg" ' + mysqldumpfilename)
-    #         run('sed -i "s#\'asu_#\''+dbprefix+'#mg" ' + mysqldumpfilename)
-    #         run('sed -i "s#\\\`asu_#\\\`'+dbprefix+'#mg" ' + mysqldumpfilename)
-    #         # sed(mysqldumpfilename, "wp-install-template.allstruck.org", location)
-    #         # sed(mysqldumpfilename, '\x27asu_', '\x27' + dbprefix)
-    #         # sed(mysqldumpfilename, "`asu_", "`" + dbprefix)
-    #         lprint('Import:')
-    #         run('mysql --user=root --password=$SQLROOTPWD ' + dbname + ' < ' + mysqldumpfilename)
+                element.click()
+        except:
+            eprint("Had a problem installing Headway Template")
+            pass
+        hprint("Closing Headway Grid Tutorial tooltip")
+        driver.get('http://'+domain+'/?visual-editor=true&visual-editor-mode=grid')
+        try:
+            hw_tutorial_close_button = WebDriverWait(driver, 3).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "#qtip-tour a.qtip-close"))
+            )
+            hw_tutorial_close_button.click()
+        except:
+            eprint("Error closing Headway Grid Tutorial tooltip")
+            pass
+        hprint("Closing WordPress SEO Tutorial tooltip.")
+        driver.get('http://'+domain+'/?visual-editor=true&visual-editor-mode=design&ve-layout=front_page')
+        try:
+            close_seo_tutorial_button = WebDriverWait(driver, 3).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "#qtip-tour a.qtip-close"))
+            )
+            close_seo_tutorial_button.click()
+        except:
+            eprint("Error closing Headway Design Tutorial tooltip")
+            pass
+    finally:
+        driver.quit()
+    # driver.get('http://'+domain+'/wp-admin/')
+    # try:
+    #     driver.execute_script('jQuery("form#upload-skin").css("display","block");')
+    #     element = WebDriverWait(driver, 180).until(
+    #         EC.presence_of_element_located((By.CSS_SELECTOR, "a#pointer-close"))
+    #     )
+    #     element.click()
+    # finally:
+    #     driver.quit()
+    # driver.get('http://'+domain+'/wp-admin/')
+    # try:
+    #     driver.execute_script('jQuery("form#upload-skin").css("display","block");')
+    #     element = WebDriverWait(driver, 180).until(
+    #         EC.presence_of_element_located((By.CSS_SELECTOR, "a#pointer-close"))
+    #     )
+    #     element.click()
+    # finally:
+    #     driver.quit()
+
+#def wordpressdevcopy(location, dbname, dbuser, dbpass, dbprefix):
+#    hprint("Creating copy of WordPress Dev install.")
+#    eprint("THIS DOES NOT WORK, QUITTING...")
+#    return
+#
+#    with cd('/var/www/vhost/' + location + '/public'):
+#        lprint("Moving files...")
+#        run('cp -a /var/www/vhost/wp-install-template.allstruck.org/public/* ./')
+#        lprint("Replacing old url with new...")
+#        run('find ./wp-content/themes/ -type f -exec sed -i "s#wp-install-template.allstruck.org#'+ location +'#g" {} \;')
+#        run('find ./wp-content/plugins/ -type f -exec sed -i "s#wp-install-template.allstruck.org#'+ location +'#g" {} \;')
+#        run('find ./wp-content/cache/ -type f -exec sed -i "s#wp-install-template.allstruck.org#'+ location +'#g" {} \;')
+#        run('find ./wp-content/*.php -type f -exec sed -i "s#wp-install-template.allstruck.org#'+ location +'#g" {} \;')
+#        lprint('Adding new settings to wp-config.php')
+#        sed("./wp-config.php", "asu_", dbprefix, flags="m")
+#        run('sed -i "s#define(\'DB_NAME\', \'wpinstalltemp\')#define(\'DB_NAME\', \''+dbname+'\')#mg" wp-config.php')
+#        run('sed -i "s#define(\'DB_USER\', \'wpinstalltemp\')#define(\'DB_NAME\', \''+dbuser+'\')#mg" wp-config.php')
+#        run('sed -i "s#define(\'DB_PASSWORD\', \'[^\']*\')#define(\'DB_NAME\', \''+dbpass+'\')#mg" wp-config.php')
+#        # sed("./wp-config.php", "define(\'DB_NAME\', \'wpinstalltemp\')", "define(\'DB_NAME\', \'" + dbname + "\')")
+#        # sed("./wp-config.php", "define(\'DB_USER\', \'wpinstalltemp\')/define(\'DB_USER\', \'" + dbuser + "\')")
+#        # sed("./wp-config.php", "define(\'DB_PASSWORD\', \'[^\']*\')", "define(\'DB_PASSWORD\', \'" + dbpass + "\')")
+#
+#    lprint('Now handling the database...')
+#    # with cd('/var/www/vhost/wp-install-template.allstruck.org/public/'):
+#    #     run('wp db export')
+#    # with cd('/var/www/vhost/' + location + '/backup'):
+#    #     with shell_env(SQLROOTPWD=passwordstore(server=env.host_string, service='mysql', user='root')):
+#    #         templatedbname = 'wpinstalltemp'
+#    #         mysqldumpfilename = 'wpinstalltemp.sql'
+#    #         lprint('Export:')
+#    #         run('mysqldump -n --quick --result-file='+mysqldumpfilename+' --databases ' + templatedbname + ' --user=root --password=$SQLROOTPWD')
+#    #         lprint('Replace:')
+#    #         run('sed -i "s#wp-install-template.allstruck.org#'+location+'#mg" ' + mysqldumpfilename)
+#    #         run('sed -i "s#\'asu_#\''+dbprefix+'#mg" ' + mysqldumpfilename)
+#    #         run('sed -i "s#\\\`asu_#\\\`'+dbprefix+'#mg" ' + mysqldumpfilename)
+#    #         # sed(mysqldumpfilename, "wp-install-template.allstruck.org", location)
+#    #         # sed(mysqldumpfilename, '\x27asu_', '\x27' + dbprefix)
+#    #         # sed(mysqldumpfilename, "`asu_", "`" + dbprefix)
+#    #         lprint('Import:')
+#    #         run('mysql --user=root --password=$SQLROOTPWD ' + dbname + ' < ' + mysqldumpfilename)
 
 def wpcli(domain,command,parameters):
     with cd('/var/www/vhost/'+domain+'/public/'):
@@ -746,8 +881,8 @@ def a2(task='', att=''):
         'dissite': "run('a2dissite ' + att)",
         'enmod': "run('a2enmod ' + att)",
         'dismod': "run('a2dismod ' + att)",
-        'sites-available': "ls('" + apachevhostconfigdir + "')",
-        'sites-enabled': "ls('" + apachevhostconfigdir + "../sites-enabled')",
+        'sites-available': "ls('" + apachevhostconfigdir + "', '')",
+        'sites-enabled': "ls('" + apachevhostconfigdir + "../sites-enabled', '')",
         'sites-files': "run('ls " + apachevhostroot + "')"
     }
     eval(tasks[task])
@@ -827,7 +962,7 @@ def rm(path, att='', safe=True):
             if path[-4:] == '.zip':
                 run('turbolift -r dfw upload --source '+path+' --container secret-robot-safe-delete')
                 run('rm ' + att + ' ' + path)
-            else: 
+            else:
                 # Zip contents of file or directory (and remove contents),
                 #  upload to cloud files, then delete zip file:
                 tempzipfilename = path+'-'+datetime+'.zip'
